@@ -11,8 +11,10 @@
 
 /**
  * Struct to hold all three pieces of a URL
+ * initial
  */
-typedef struct urlinfo_t {
+typedef struct urlinfo_t
+{
   char *hostname;
   char *port;
   char *path;
@@ -36,10 +38,9 @@ urlinfo_t *parse_url(char *url)
 
   /*
     We can parse the input URL by doing the following:
-
-    1. Use strchr to find the first slash in the URL (this is assuming there is no http:// or https:// in the URL).
+    1. Use strchr to find the first backslash in the URL (this is assuming there is no http:// or https:// in the URL).
     2. Set the path pointer to 1 character after the spot returned by strchr.
-    3. Overwrite the slash with a '\0' so that we are no longer considering anything after the slash.
+    3. Overwrite the backslash with a '\0' so that we are no longer considering anything after the backslash.
     4. Use strchr to find the first colon in the URL.
     5. Set the port pointer to 1 character after the spot returned by strchr.
     6. Overwrite the colon with a '\0' so that we are just left with the hostname.
@@ -48,6 +49,41 @@ urlinfo_t *parse_url(char *url)
   ///////////////////
   // IMPLEMENT ME! //
   ///////////////////
+  if (strstr(url, "http://"))
+  {
+    hostname = strdup(url + 7);
+  }
+  else if (strstr(url, "https://"))
+  {
+    hostname = strdup(url + 8);
+  }
+  else
+  {
+    hostname = strdup(url);
+  }
+
+  if (strchr(hostname, '/'))
+  {
+    path = strchr(hostname, '/') + 1;
+    *(path - 1) = '\0';
+  }
+  else
+  {
+    path = "";
+  }
+
+  if (strchr(hostname, ':'))
+  {
+    port = strchr(hostname, ':') + 1;
+    *(port - 1) = '\0';
+  }
+  else
+  {
+    port = "80";
+  }
+  urlinfo->path = path;
+  urlinfo->port = port;
+  urlinfo->hostname = hostname;
 
   return urlinfo;
 }
@@ -71,17 +107,32 @@ int send_request(int fd, char *hostname, char *port, char *path)
   ///////////////////
   // IMPLEMENT ME! //
   ///////////////////
+  int request_length = snprintf(request, max_request_size,
+                                "GET /%s HTTP/1.1\n"
+                                "Host: %s:%s\n"
+                                "Connection: close\n"
+                                "\n",
+                                path, hostname, port);
 
-  return 0;
+  rv = send(fd, request, request_length, 0);
+
+  if (rv < 0)
+  {
+    printf("request err");
+    exit(2);
+  }
+
+  return rv;
 }
 
 int main(int argc, char *argv[])
-{  
-  int sockfd, numbytes;  
+{
+  int sockfd, numbytes;
   char buf[BUFSIZE];
 
-  if (argc != 2) {
-    fprintf(stderr,"usage: client HOSTNAME:PORT/PATH\n");
+  if (argc != 2)
+  {
+    fprintf(stderr, "usage: client HOSTNAME:PORT/PATH\n");
     exit(1);
   }
 
@@ -96,6 +147,22 @@ int main(int argc, char *argv[])
   ///////////////////
   // IMPLEMENT ME! //
   ///////////////////
+  urlinfo_t *urlinfo = malloc(sizeof(urlinfo_t));
+  urlinfo = parse_url(argv[1]);
+  sockfd = get_socket(urlinfo->hostname, urlinfo->port);
+  numbytes = send_request(sockfd, urlinfo->hostname, urlinfo->port, urlinfo->path);
+  while ((numbytes = recv(sockfd, buf, BUFSIZE - 1, 0)) > 0)
+  {
+    printf("%s\n", buf);
+  }
+  close(sockfd);
+  urlinfo->port = NULL;
+  urlinfo->hostname = NULL;
+  urlinfo->path = NULL;
 
+  free(urlinfo->port);
+  free(urlinfo->path);
+  free(urlinfo->hostname);
+  free(urlinfo);
   return 0;
 }
